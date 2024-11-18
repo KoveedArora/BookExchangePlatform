@@ -58,40 +58,33 @@ exports.resetPassword = async (req, res) => {
 };
 
 exports.register = async (req, res) => {
+  console.log('Registration request received:', req.body); // Log request data
   try {
     const { name, email, password } = req.body;
 
-    // Check if the user already exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ error: 'User already exists.' });
+    // Check if all fields are provided
+    if (!name || !email || !password) {
+      console.error('Validation Error: Missing fields');
+      return res.status(400).json({ error: 'Name, email, and password are required.' });
     }
 
-    // Hash the password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    // Check if the email already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      console.error('Validation Error: Email already in use');
+      return res.status(400).json({ error: 'Email is already registered.' });
+    }
 
-    // Create a new user
-    const user = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-    });
+    // Create and save the user
+    const user = new User({ name, email, password });
+    await user.save();
+    console.log('User registered successfully:', user);
 
-    // Generate a JWT token
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
-    // Respond with the token and user data
-    res.status(201).json({
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-      },
-    });
+    // Generate JWT token
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
+    res.status(201).json({ user: { id: user._id, name: user.name, email: user.email }, token });
   } catch (err) {
-    console.error('Error during user registration:', err);
-    res.status(500).json({ error: 'Server error. Please try again later.' });
+    console.error('Error during registration:', err);
+    res.status(500).json({ error: 'An error occurred during registration. Please try again later.' });
   }
 };
